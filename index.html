@@ -41,6 +41,8 @@ th,td{text-align:left;padding:12px 14px;border-bottom:1px solid var(--line);whit
 th{font-size:11px;text-transform:uppercase;color:#777883;background:#101014}
 .badge{padding:5px 8px;border-radius:999px;font-size:11px;border:1px solid #333}
 .badge.ok{color:var(--green);background:#143227}.badge.wait{color:var(--yellow);background:#352d16}.badge.back{color:#ff9a76;background:#3a211b}
+.badge.dup{color:#f5c451;background:#352d16}
+tr.duplicate-row td{background:rgba(245,196,81,.045)}
 .empty{padding:40px;text-align:center;color:var(--muted)}
 input[type=file]{display:none}
 .search{background:#111116;border:1px solid var(--line);color:#fff;padding:9px 11px;border-radius:9px;min-width:220px}
@@ -129,6 +131,35 @@ function normStatus(s=''){
 }
 function badgeClass(s){return s==='Aguardando'?'wait':s==='Voltou'?'back':'ok'}
 
+
+function normalizeKeyPart(v=''){
+  return String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/\s+/g,' ').trim();
+}
+function duplicateKey(x){
+  return [
+    normalizeKeyPart(x.tipo),
+    normalizeKeyPart(x.banco),
+    Number(x.credito||0).toFixed(2),
+    Number(x.entrada||0).toFixed(2),
+    normalizeKeyPart(x.prazo),
+    normalizeKeyPart(x.vencimento)
+  ].join('|');
+}
+function markDuplicates(list){
+  const counts={};
+  list.forEach(x=>{const k=duplicateKey(x);counts[k]=(counts[k]||0)+1;});
+  list.forEach(x=>x.duplicado=(counts[duplicateKey(x)]||0)>1);
+}
+function addItems(newItems){
+  items=[...items,...newItems];
+  markDuplicates(items);
+  localStorage.setItem('margareth-items',JSON.stringify(items));
+}
+function duplicateCount(){
+  markDuplicates(items);
+  return items.filter(x=>x.duplicado).length;
+}
+
 function convertText(){
   const raw=document.getElementById('raw').value.trim();
   if(!raw) return;
@@ -165,8 +196,7 @@ function convertText(){
     }
   }
   if(cur) out.push(cur);
-  items=[...items,...out];
-  localStorage.setItem('margareth-items',JSON.stringify(items));
+  addItems(out);
   document.getElementById('summary').innerHTML='<div style="padding:18px"><div class="value" style="font-size:32px;font-weight:800">'+out.length+'</div><div class="sub">registro(s) identificado(s)</div><hr style="border:0;border-top:1px solid #26262d;margin:16px 0"><div><b>Tipo:</b> '+tipo+'</div><div><b>Banco:</b> '+banco+'</div></div>';
   render();
 }
@@ -174,10 +204,11 @@ function render(){
   const q=document.getElementById('search').value.toLowerCase();
   const data=items.filter(x=>JSON.stringify(x).toLowerCase().includes(q));
   const tb=document.getElementById('tbody');
-  tb.innerHTML=data.map(x=>`<tr>
+  markDuplicates(items);
+  tb.innerHTML=data.map(x=>`<tr class="${x.duplicado?'duplicate-row':''}">
     <td>${x.tipo}</td><td>${x.banco}</td><td>${brl(x.credito)}</td><td>${brl(x.entrada)}</td>
     <td>${x.prazo||'-'}</td><td>${x.vencimento||'-'}</td>
-    <td><span class="badge ${badgeClass(x.status)}">${x.status}</span></td><td>${x.observacao||'-'}</td>
+    <td><span class="badge ${badgeClass(x.status)}">${x.status}</span> ${x.duplicado?'<span class="badge dup">Duplicado</span>':''}</td><td>${x.observacao||'-'}</td>
   </tr>`).join('');
   document.getElementById('empty').style.display=data.length?'none':'block';
   document.getElementById('totalCotas').textContent=items.length;
@@ -190,6 +221,8 @@ function clearAll(){
 }
 function exportCSV(){
   if(!items.length)return alert('Não há dados para exportar.');
+  const dup=duplicateCount();
+  if(dup>0 && !confirm('Foram encontrados '+dup+' registro(s) duplicado(s). Deseja exportar mesmo assim, mantendo os duplicados?')) return;
   const cols=['tipo','banco','credito','entrada','prazo','vencimento','status','observacao'];
   const rows=[cols.join(';'),...items.map(x=>cols.map(c=>('"'+String(x[c]??'').replace(/"/g,'""')+'"')).join(';'))];
   const blob=new Blob(['\ufeff'+rows.join('\n')],{type:'text/csv;charset=utf-8'});
@@ -264,8 +297,7 @@ document.getElementById('xlsx').addEventListener('change', async (ev)=>{
       }
     }
     if(!imported.length) throw new Error('Nenhuma cota reconhecida na planilha.');
-    items=[...items,...imported];
-    localStorage.setItem('margareth-items',JSON.stringify(items));
+    addItems(imported);
     document.getElementById('summary').innerHTML='<div style="padding:18px"><div class="value" style="font-size:32px;font-weight:800">'+imported.length+'</div><div class="sub">registro(s) importado(s) da planilha</div><hr style="border:0;border-top:1px solid #26262d;margin:16px 0"><div><b>Arquivo:</b> '+file.name+'</div></div>';
     render();
   }catch(err){
@@ -274,6 +306,7 @@ document.getElementById('xlsx').addEventListener('change', async (ev)=>{
     ev.target.value='';
   }
 });
+markDuplicates(items);
 render();
 </script>
 </body>
