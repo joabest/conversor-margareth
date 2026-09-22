@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Conversor Margareth</title>
+<style>
+:root{
+  --bg:#0d0d0f;--panel:#121216;--panel2:#17171c;--line:#26262d;--text:#f4f4f5;--muted:#9a9aa3;
+  --accent:#7c5cff;--green:#3ddc97;--yellow:#f5c451;--red:#ff6b6b;--blue:#4da3ff;
+}
+*{box-sizing:border-box}
+body{margin:0;background:linear-gradient(180deg,#0a0a0c,#101014);color:var(--text);font:14px Inter,Arial,sans-serif}
+.app{display:grid;grid-template-columns:230px 1fr;min-height:100vh}
+.sidebar{border-right:1px solid var(--line);background:#0b0b0e;padding:22px 14px;position:sticky;top:0;height:100vh}
+.brand{display:flex;gap:10px;align-items:center;padding:0 10px 24px;font-weight:700}
+.logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#8b5cf6,#ec4899)}
+.nav a{display:flex;padding:11px 12px;margin:5px 0;color:var(--muted);text-decoration:none;border-radius:9px}
+.nav a.active,.nav a:hover{background:#17171d;color:#fff}
+.main{padding:26px}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px}
+h1{font-size:22px;margin:0 0 4px}.sub{color:var(--muted)}
+.actions{display:flex;gap:10px}
+button,.filebtn{border:1px solid var(--line);background:#17171d;color:#fff;border-radius:9px;padding:10px 13px;cursor:pointer}
+.primary{background:#7c5cff;border-color:#7c5cff}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+.card .label{color:var(--muted);font-size:12px}.card .value{font-size:24px;font-weight:800;margin-top:8px}
+.layout{display:grid;grid-template-columns:1.2fr .8fr;gap:16px;margin-bottom:18px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.panelhead{padding:15px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+textarea{width:100%;min-height:290px;background:#0e0e12;color:#fff;border:0;outline:none;padding:16px;resize:vertical;line-height:1.5}
+.tools{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--line);flex-wrap:wrap}
+.tablewrap{overflow:auto}
+table{width:100%;border-collapse:collapse;min-width:920px}
+th,td{text-align:left;padding:12px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:11px;text-transform:uppercase;color:#777883;background:#101014}
+.badge{padding:5px 8px;border-radius:999px;font-size:11px;border:1px solid #333}
+.badge.ok{color:var(--green);background:#143227}.badge.wait{color:var(--yellow);background:#352d16}.badge.back{color:#ff9a76;background:#3a211b}
+.empty{padding:40px;text-align:center;color:var(--muted)}
+input[type=file]{display:none}
+.search{background:#111116;border:1px solid var(--line);color:#fff;padding:9px 11px;border-radius:9px;min-width:220px}
+.small{font-size:12px;color:var(--muted)}
+@media(max-width:980px){.app{grid-template-columns:1fr}.sidebar{height:auto;position:relative;border-right:0;border-bottom:1px solid var(--line)}.nav{display:flex;overflow:auto}.nav a{white-space:nowrap}.grid{grid-template-columns:repeat(2,1fr)}.layout{grid-template-columns:1fr}}
+@media(max-width:620px){.main{padding:14px}.grid{grid-template-columns:1fr}.top{align-items:flex-start;gap:12px;flex-direction:column}.actions{width:100%;flex-wrap:wrap}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar">
+  <div class="brand"><div class="logo"></div><div>Conversor<br>Margareth</div></div>
+  <nav class="nav">
+    <a class="active" href="#">Dashboard</a>
+    <a href="#importar">Importar dados</a>
+    <a href="#cotas">Cotas</a>
+    <a href="#auto">AUTO</a>
+    <a href="#imovel">IMÓVEL</a>
+  </nav>
+  <div class="small" style="position:absolute;bottom:18px;padding:0 10px">Dados ficam somente no navegador.</div>
+</aside>
+<main class="main">
+  <div class="top">
+    <div><h1>Status das cotas</h1><div class="sub">Cole mensagens do WhatsApp e transforme em uma tabela visual.</div></div>
+    <div class="actions">
+      <input id="xlsx" type="file" accept=".xlsx,.xls,.csv"/>
+      <label class="filebtn" for="xlsx">Importar planilha</label>
+      <button onclick="exportCSV()">Exportar CSV</button>
+    </div>
+  </div>
+  <section class="grid">
+    <div class="card"><div class="label">Total de cotas</div><div class="value" id="totalCotas">0</div></div>
+    <div class="card"><div class="label">Crédito total</div><div class="value" id="creditoTotal">R$ 0,00</div></div>
+    <div class="card"><div class="label">Entrada total</div><div class="value" id="entradaTotal">R$ 0,00</div></div>
+    <div class="card"><div class="label">Registros com observação</div><div class="value" id="obsTotal">0</div></div>
+  </section>
+
+  <section class="layout" id="importar">
+    <div class="panel">
+      <div class="panelhead"><strong>Colar texto</strong><span class="small">Ex.: AUTO ITAÚ</span></div>
+      <textarea id="raw" placeholder="Cole aqui o texto recebido no WhatsApp..."></textarea>
+      <div class="tools">
+        <button class="primary" onclick="convertText()">Converter texto</button>
+        <button onclick="loadSample()">Carregar exemplo</button>
+        <button onclick="clearAll()">Limpar dados</button>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panelhead"><strong>Resumo da importação</strong></div>
+      <div id="summary" class="empty">Nenhum dado convertido ainda.</div>
+    </div>
+  </section>
+
+  <section class="panel" id="cotas">
+    <div class="panelhead">
+      <strong>Cotas convertidas</strong>
+      <input class="search" id="search" placeholder="Buscar banco, status, valor..." oninput="render()"/>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Tipo</th><th>Banco</th><th>Crédito</th><th>Entrada</th><th>Prazo / Parcela</th><th>Vencimento</th><th>Status</th><th>Observação</th></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div id="empty" class="empty">Cole um texto acima e clique em “Converter texto”.</div>
+    </div>
+  </section>
+</main>
+</div>
+
+<script>
+let items = JSON.parse(localStorage.getItem('margareth-items')||'[]');
+
+const brl = n => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(n||0);
+
+function moneyToNumber(v=''){
+  v = String(v).replace(/R\$:?/gi,'').trim().replace(/\./g,'').replace(',','.');
+  const n = parseFloat(v.replace(/[^\d.-]/g,''));
+  return isNaN(n)?0:n;
+}
+function normStatus(s=''){
+  const u=s.toUpperCase();
+  if(u.includes('AGUARDANDO')) return 'Aguardando';
+  if(u.includes('VOLTOU')) return 'Voltou';
+  return 'Disponível';
+}
+function badgeClass(s){return s==='Aguardando'?'wait':s==='Voltou'?'back':'ok'}
+
+function convertText(){
+  const raw=document.getElementById('raw').value.trim();
+  if(!raw) return;
+  const lines=raw.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+  let tipo='AUTO', banco='Não informado';
+  const head=lines.find(x=>/AUTO|IM[ÓO]VEL/i.test(x));
+  if(head){
+    tipo=/IM[ÓO]VEL/i.test(head)?'IMÓVEL':'AUTO';
+    banco=head.replace(/AUTO|IM[ÓO]VEL/ig,'').replace(/[🚘🏠]/g,'').trim()||'Não informado';
+  }
+  const out=[];
+  let cur=null;
+  for(let i=0;i<lines.length;i++){
+    const l=lines[i];
+    if(/^Cr[eé]dito:/i.test(l)){
+      if(cur) out.push(cur);
+      const after=l.replace(/^Cr[eé]dito:\s*/i,'');
+      const m=after.match(/R\$:?\s*([\d.]+(?:,\d{2})?)/i);
+      cur={tipo,banco,credito:moneyToNumber(m?m[1]:after),entrada:0,prazo:'',vencimento:'',status:'Disponível',observacao:''};
+      const extra=after.replace(/R\$:?\s*[\d.]+(?:,\d{2})?/i,'').trim();
+      if(extra) cur.observacao=extra;
+    }else if(cur && /^Entrada:/i.test(l)){
+      cur.entrada=moneyToNumber(l.replace(/^Entrada:\s*/i,''));
+    }else if(cur && /^Prazo e parcela:/i.test(l)){
+      cur.prazo=l.replace(/^Prazo e parcela:\s*/i,'').replace(/R\$:/gi,'R$').trim();
+    }else if(cur && /^Pr[oó]ximo vencimento:/i.test(l)){
+      cur.vencimento=l.replace(/^Pr[oó]ximo vencimento:\s*/i,'').trim();
+    }else if(cur && !/^(AUTO|IM[ÓO]VEL)/i.test(l) && !/^[🚘🏠]+$/.test(l)){
+      const st=normStatus(l);
+      if(st!=='Disponível') cur.status=st;
+      if(!/Cr[eé]dito|Entrada|Prazo|vencimento/i.test(l)){
+        cur.observacao=(cur.observacao?cur.observacao+' | ':'')+l.replace(/[()]/g,'');
+      }
+    }
+  }
+  if(cur) out.push(cur);
+  items=[...items,...out];
+  localStorage.setItem('margareth-items',JSON.stringify(items));
+  document.getElementById('summary').innerHTML='<div style="padding:18px"><div class="value" style="font-size:32px;font-weight:800">'+out.length+'</div><div class="sub">registro(s) identificado(s)</div><hr style="border:0;border-top:1px solid #26262d;margin:16px 0"><div><b>Tipo:</b> '+tipo+'</div><div><b>Banco:</b> '+banco+'</div></div>';
+  render();
+}
+function render(){
+  const q=document.getElementById('search').value.toLowerCase();
+  const data=items.filter(x=>JSON.stringify(x).toLowerCase().includes(q));
+  const tb=document.getElementById('tbody');
+  tb.innerHTML=data.map(x=>`<tr>
+    <td>${x.tipo}</td><td>${x.banco}</td><td>${brl(x.credito)}</td><td>${brl(x.entrada)}</td>
+    <td>${x.prazo||'-'}</td><td>${x.vencimento||'-'}</td>
+    <td><span class="badge ${badgeClass(x.status)}">${x.status}</span></td><td>${x.observacao||'-'}</td>
+  </tr>`).join('');
+  document.getElementById('empty').style.display=data.length?'none':'block';
+  document.getElementById('totalCotas').textContent=items.length;
+  document.getElementById('creditoTotal').textContent=brl(items.reduce((a,b)=>a+(+b.credito||0),0));
+  document.getElementById('entradaTotal').textContent=brl(items.reduce((a,b)=>a+(+b.entrada||0),0));
+  document.getElementById('obsTotal').textContent=items.filter(x=>x.observacao).length;
+}
+function clearAll(){
+  if(confirm('Apagar todos os dados salvos neste navegador?')){items=[];localStorage.removeItem('margareth-items');document.getElementById('summary').innerHTML='Nenhum dado convertido ainda.';render();}
+}
+function exportCSV(){
+  if(!items.length)return alert('Não há dados para exportar.');
+  const cols=['tipo','banco','credito','entrada','prazo','vencimento','status','observacao'];
+  const rows=[cols.join(';'),...items.map(x=>cols.map(c=>('"'+String(x[c]??'').replace(/"/g,'""')+'"')).join(';'))];
+  const blob=new Blob(['\ufeff'+rows.join('\n')],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='cotas-convertidas.csv';a.click();URL.revokeObjectURL(a.href);
+}
+function loadSample(){
+document.getElementById('raw').value=`AUTO ITAÚ
+🚘🚘🚘
+
+Crédito: R$ 38.500
+Entrada: R$: 10.500
+Prazo e parcela: 44 x R$: 929,00
+Próximo vencimento: 05/10/2026
+
+Crédito: R$ 43.200
+Entrada: R$: 14.700
+Prazo e parcela: 58 x R$: 757,00
+Próximo vencimento: 15/09/2026
+(COM FICHA AGUARDANDO RESPOSTA)
+
+Crédito: R$ 127.800 Junção de 2 cotas
+Entrada: R$: 39.400
+Prazo e parcela: 44 x R$: 2.758,00 + 6 x R$: 1.829,00
+Próximo vencimento: 05/10/2026`;
+}
+document.getElementById('xlsx').addEventListener('change',()=>alert('Nesta versão inicial, use CSV exportado da planilha ou cole o texto. Posso adicionar leitura nativa de XLSX na próxima atualização.'));
+render();
+</script>
+</body>
+</html>
