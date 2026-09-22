@@ -48,6 +48,7 @@ input[type=file]{display:none}
 @media(max-width:980px){.app{grid-template-columns:1fr}.sidebar{height:auto;position:relative;border-right:0;border-bottom:1px solid var(--line)}.nav{display:flex;overflow:auto}.nav a{white-space:nowrap}.grid{grid-template-columns:repeat(2,1fr)}.layout{grid-template-columns:1fr}}
 @media(max-width:620px){.main{padding:14px}.grid{grid-template-columns:1fr}.top{align-items:flex-start;gap:12px;flex-direction:column}.actions{width:100%;flex-wrap:wrap}}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 <div class="app">
@@ -214,7 +215,65 @@ Entrada: R$: 39.400
 Prazo e parcela: 44 x R$: 2.758,00 + 6 x R$: 1.829,00
 Próximo vencimento: 05/10/2026`;
 }
-document.getElementById('xlsx').addEventListener('change',()=>alert('Nesta versão inicial, use CSV exportado da planilha ou cole o texto. Posso adicionar leitura nativa de XLSX na próxima atualização.'));
+document.getElementById('xlsx').addEventListener('change', async (ev)=>{
+  const file=ev.target.files && ev.target.files[0];
+  if(!file) return;
+  try{
+    const buf=await file.arrayBuffer();
+    const book=XLSX.read(buf,{type:'array',cellDates:true});
+    let imported=[];
+    for(const sheetName of book.SheetNames){
+      const sheet=book.Sheets[sheetName];
+      const rows=XLSX.utils.sheet_to_json(sheet,{header:1,defval:''});
+      let tipo='IMÓVEL', banco='Não informado';
+      for(const row of rows){
+        const cells=row.map(v=>String(v??'').trim());
+        const joined=cells.join(' ').trim();
+        if(!joined) continue;
+        if(/\bAUTO\b/i.test(joined)) tipo='AUTO';
+        if(/IM[ÓO]VEL/i.test(joined)) tipo='IMÓVEL';
+
+        // Rows containing only a bank/administrator name act as section labels.
+        const nonEmpty=cells.filter(Boolean);
+        if(nonEmpty.length===1 && !/CR[EÉ]DITO|ENTRADA|PRAZO|VENCIMENTO|AUTO|IM[ÓO]VEL/i.test(nonEmpty[0])){
+          banco=nonEmpty[0];
+          continue;
+        }
+        if(/CR[EÉ]DITO/i.test(cells[0]) && /ENTRADA/i.test(cells[1]||'')) continue;
+
+        const credito=typeof row[0]==='number'?row[0]:moneyToNumber(cells[0]);
+        const entrada=typeof row[1]==='number'?row[1]:moneyToNumber(cells[1]);
+        if(credito>0 && entrada>=0){
+          let venc=cells[4]||'';
+          if(row[4] instanceof Date && !isNaN(row[4])) venc=row[4].toLocaleDateString('pt-BR');
+          else if(typeof row[4]==='number' && row[4]>30000){
+            const d=XLSX.SSF.parse_date_code(row[4]);
+            if(d) venc=String(d.d).padStart(2,'0')+'/'+String(d.m).padStart(2,'0')+'/'+d.y;
+          }
+          imported.push({
+            tipo,
+            banco:(cells[3]||banco||'Não informado').toUpperCase(),
+            credito,
+            entrada,
+            prazo:cells[2]||'',
+            vencimento:venc,
+            status:'Disponível',
+            observacao:''
+          });
+        }
+      }
+    }
+    if(!imported.length) throw new Error('Nenhuma cota reconhecida na planilha.');
+    items=[...items,...imported];
+    localStorage.setItem('margareth-items',JSON.stringify(items));
+    document.getElementById('summary').innerHTML='<div style="padding:18px"><div class="value" style="font-size:32px;font-weight:800">'+imported.length+'</div><div class="sub">registro(s) importado(s) da planilha</div><hr style="border:0;border-top:1px solid #26262d;margin:16px 0"><div><b>Arquivo:</b> '+file.name+'</div></div>';
+    render();
+  }catch(err){
+    alert('Não foi possível importar a planilha: '+err.message);
+  }finally{
+    ev.target.value='';
+  }
+});
 render();
 </script>
 </body>
