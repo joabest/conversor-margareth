@@ -71,7 +71,7 @@ input[type=file]{display:none}
     <div class="actions">
       <input id="xlsx" type="file" accept=".xlsx,.xls,.csv"/>
       <label class="filebtn" for="xlsx">Importar planilha</label>
-      <button onclick="exportCSV()">Exportar CSV</button>
+      <button onclick="exportXLSX()">Exportar XLSX</button>
     </div>
   </div>
   <section class="grid">
@@ -219,14 +219,42 @@ function render(){
 function clearAll(){
   if(confirm('Apagar todos os dados salvos neste navegador?')){items=[];localStorage.removeItem('margareth-items');document.getElementById('summary').innerHTML='Nenhum dado convertido ainda.';render();}
 }
-function exportCSV(){
+function exportXLSX(){
   if(!items.length)return alert('Não há dados para exportar.');
   const dup=duplicateCount();
   if(dup>0 && !confirm('Foram encontrados '+dup+' registro(s) duplicado(s). Deseja exportar mesmo assim, mantendo os duplicados?')) return;
-  const cols=['tipo','banco','credito','entrada','prazo','vencimento','status','observacao'];
-  const rows=[cols.join(';'),...items.map(x=>cols.map(c=>('"'+String(x[c]??'').replace(/"/g,'""')+'"')).join(';'))];
-  const blob=new Blob(['\ufeff'+rows.join('\n')],{type:'text/csv;charset=utf-8'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='cotas-convertidas.csv';a.click();URL.revokeObjectURL(a.href);
+
+  const headers=['TIPO','BANCO','CRÉDITO','ENTRADA','PRAZO','VENCIMENTO','STATUS','OBSERVAÇÃO'];
+  const data=items.map(x=>[
+    String(x.tipo||'').toUpperCase(),
+    String(x.banco||'').toUpperCase(),
+    Number(x.credito||0),
+    Number(x.entrada||0),
+    String(x.prazo||''),
+    String(x.vencimento||''),
+    String(x.status||'').toUpperCase(),
+    String(x.observacao||'').toUpperCase()
+  ]);
+
+  const ws=XLSX.utils.aoa_to_sheet([headers,...data]);
+  ws['!cols']=[
+    {wch:14},{wch:22},{wch:18},{wch:18},{wch:38},{wch:16},{wch:18},{wch:48}
+  ];
+  ws['!autofilter']={ref:'A1:H'+(data.length+1)};
+
+  // Mantém os valores como números reais, mas exibidos com pontuação brasileira.
+  for(let r=2;r<=data.length+1;r++){
+    if(ws['C'+r]){ws['C'+r].t='n';ws['C'+r].z='#,##0.00';}
+    if(ws['D'+r]){ws['D'+r].t='n';ws['D'+r].z='#,##0.00';}
+  }
+
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'COTAS');
+
+  const now=new Date();
+  const pad=n=>String(n).padStart(2,'0');
+  const stamp=pad(now.getDate())+'-'+pad(now.getMonth()+1)+'-'+now.getFullYear()+'_'+pad(now.getHours())+'-'+pad(now.getMinutes())+'-'+pad(now.getSeconds());
+  XLSX.writeFile(wb,'cotas-convertidas_'+stamp+'.xlsx',{compression:true});
 }
 function loadSample(){
 document.getElementById('raw').value=`AUTO ITAÚ
